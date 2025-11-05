@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Concrete/Mixture Machine Counter</title>
+  <style>
+    :root{--bg:#0f1724;--card:#0b1220;--muted:#9aa4b2;--accent:#06b6d4;--success:#10b981}
+    *{box-sizing:border-box}
+    body{font-family:Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; margin:0; background:linear-gradient(180deg,#071021 0%, #081427 100%); color:#e6eef6; padding:28px}
+    .container{max-width:980px;margin:0 auto}
+    header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
+    h1{font-size:20px;margin:0}
+    .card{background:rgba(255,255,255,0.03);border-radius:12px;padding:18px;margin-bottom:16px;box-shadow:0 6px 18px rgba(0,0,0,0.45)}
+    .materials{display:flex;gap:12px}
+    .material{flex:1;padding:12px;border-radius:10px;background:linear-gradient(180deg,rgba(255,255,255,0.015),transparent);}
+    .mat-name{font-size:13px;color:var(--muted);}
+    .mat-count{font-size:34px;margin-top:8px}
+    button{appearance:none;border:0;background:var(--accent);color:#021124;padding:10px 12px;border-radius:8px;font-weight:600;cursor:pointer}
+    .btn-ghost{background:transparent;border:1px solid rgba(255,255,255,0.06);color:var(--muted)}
+    .controls{display:flex;gap:10px;flex-wrap:wrap}
+    .big{padding:14px 18px;font-size:16px}
+    .secondary{background:linear-gradient(180deg,rgba(255,255,255,0.02),transparent);color:var(--muted)}
+    .muted{color:var(--muted)}
+    .row{display:flex;gap:12px;align-items:center}
+    .stats{display:flex;gap:12px}
+    .stat{background:rgba(0,0,0,0.12);padding:10px;border-radius:10px;min-width:110px;text-align:center}
+    .log{max-height:220px;overflow:auto;padding:8px;border-radius:8px;background:rgba(0,0,0,0.06);}
+    .log-item{padding:8px;border-radius:6px;border-bottom:1px dashed rgba(255,255,255,0.02);}
+    .small{font-size:13px}
+    .danger{background:#ff5757;color:#121212}
+    footer{margin-top:20px;color:var(--muted);font-size:13px}
+    .flex-gap{display:flex;gap:8px;align-items:center}
+    input[type=datetime-local]{background:transparent;border:1px solid rgba(255,255,255,0.04);padding:8px;border-radius:8px;color:inherit}
+    .controls-right{margin-left:auto}
+    @media(max-width:720px){.materials{flex-direction:column}.controls{flex-direction:column}.controls-right{margin-left:0}}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Concrete / Mixture Machine Counter</h1>
+      <div class="muted small">Single-file web app — offline, saves locally</div>
+    </header>
+
+    <section class="card">
+      <div class="row">
+        <div>
+          <div class="small muted">Current round (live)</div>
+          <div class="materials" style="margin-top:8px">
+            <div class="material">
+              <div class="mat-name">Cement (pans)</div>
+              <div id="cementCount" class="mat-count">0</div>
+              <div style="margin-top:10px" class="controls">
+                <button onclick="adjust('cement',1)">+1</button>
+                <button class="btn-ghost" onclick="adjust('cement',-1)">−1</button>
+                <button class="secondary btn-ghost" onclick="setMaterial('cement',0)">reset</button>
+              </div>
+            </div>
+
+            <div class="material">
+              <div class="mat-name">Dust (pans)</div>
+              <div id="dustCount" class="mat-count">0</div>
+              <div style="margin-top:10px" class="controls">
+                <button onclick="adjust('dust',1)">+1</button>
+                <button class="btn-ghost" onclick="adjust('dust',-1)">−1</button>
+                <button class="secondary btn-ghost" onclick="setMaterial('dust',0)">reset</button>
+              </div>
+            </div>
+
+            <div class="material">
+              <div class="mat-name">Aggregate (pans)</div>
+              <div id="aggCount" class="mat-count">0</div>
+              <div style="margin-top:10px" class="controls">
+                <button onclick="adjust('aggregate',1)">+1</button>
+                <button class="btn-ghost" onclick="adjust('aggregate',-1)">−1</button>
+                <button class="secondary btn-ghost" onclick="setMaterial('aggregate',0)">reset</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-left:18px;min-width:200px">
+          <div class="small muted">Machine</div>
+          <div class="stats" style="margin-top:8px">
+            <div class="stat">
+              <div class="muted small">Started</div>
+              <div id="startedCount" style="font-size:20px">0</div>
+            </div>
+            <div class="stat">
+              <div class="muted small">Emptied</div>
+              <div id="emptiedCount" style="font-size:20px">0</div>
+            </div>
+          </div>
+
+          <div style="margin-top:12px" class="controls">
+            <button class="big" onclick="newRound()">Start New Round (save & reset)</button>
+            <button class="big btn-ghost" onclick="manualEmpty()">Empty machine</button>
+          </div>
+
+          <div style="margin-top:10px" class="small muted">Tips: Use +1 to add one pan. New Round saves current counts with a timestamp, increments Started & Emptied, and resets materials for the next round.</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div style="display:flex;align-items:center;gap:8px;justify-content:space-between;margin-bottom:8px">
+        <div>
+          <strong>Rounds log</strong>
+          <div class="small muted">All previous rounds (saved locally)</div>
+        </div>
+        <div class="flex-gap">
+          <button class="btn-ghost" onclick="downloadCSV()">Export CSV</button>
+          <button class="btn-ghost" onclick="restoreFromLocal()">Restore from local</button>
+          <button class="danger" onclick="clearAll()">Clear all</button>
+        </div>
+      </div>
+
+      <div id="log" class="log"></div>
+    </section>
+
+    <footer>
+      Features included: material counters, machine started/emptied counters, round history with timestamps, CSV export, local persistence, decrement/reset buttons, undo last round.
+    </footer>
+  </div>
+
+<script>
+// --- State ---
+const STORAGE_KEY = 'mixtureMachineState_v1';
+let state = {
+  cement: 0,
+  dust: 0,
+  aggregate: 0,
+  started: 0,
+  emptied: 0,
+  rounds: [] // {id,ts,cement,dust,aggregate}
+};
+
+// --- Helpers ---
+function saveState(){
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+function loadState(){
+  const raw = localStorage.getItem(STORAGE_KEY);
+  if(raw){
+    try{ state = JSON.parse(raw); }
+    catch(e){ console.error('failed to parse saved state', e); }
+  }
+  render();
+}
+
+function render(){
+  document.getElementById('cementCount').textContent = state.cement;
+  document.getElementById('dustCount').textContent = state.dust;
+  document.getElementById('aggCount').textContent = state.aggregate;
+  document.getElementById('startedCount').textContent = state.started;
+  document.getElementById('emptiedCount').textContent = state.emptied;
+  renderLog();
+}
+
+function renderLog(){
+  const el = document.getElementById('log');
+  el.innerHTML = '';
+  if(state.rounds.length===0){ el.innerHTML = '<div class="small muted">No rounds yet — press "Start New Round" to save the first one.</div>'; return; }
+  // show most recent first
+  state.rounds.slice().reverse().forEach(r=>{
+    const d = new Date(r.ts);
+    const nice = d.toLocaleString();
+    const div = document.createElement('div');
+    div.className = 'log-item';
+    div.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center"><div><strong>Round ${r.id}</strong> <span class=\"small muted\">@ ${nice}</span></div><div class=\"small muted\">Total pans: ${r.cement + r.dust + r.aggregate}</div></div>
+      <div style=\"margin-top:6px;display:flex;gap:10px;\"><div class=\"small\">Cement: ${r.cement}</div><div class=\"small\">Dust: ${r.dust}</div><div class=\"small\">Aggregate: ${r.aggregate}</div></div>
+      <div style=\"margin-top:8px;display:flex;gap:8px;\"><button class=\"btn-ghost small\" onclick=\"undoRound(${r.id})\">Undo this</button></div>`;
+    el.appendChild(div);
+  });
+}
+
+// --- Actions ---
+function adjust(material, delta){
+  if(!['cement','dust','aggregate'].includes(material)) return;
+  state[material] = Math.max(0, (state[material]||0) + delta);
+  saveState(); render();
+}
+
+function setMaterial(material, value){ state[material] = Math.max(0, value); saveState(); render(); }
+
+function newRound(){
+  // Save the current counts as a round
+  const id = (state.rounds.length? state.rounds[state.rounds.length-1].id + 1 : 1);
+  const round = { id, ts: Date.now(), cement: state.cement, dust: state.dust, aggregate: state.aggregate };
+  state.rounds.push(round);
+  // increment machine counters
+  state.started = (state.started||0) + 1;
+  state.emptied = (state.emptied||0) + 1;
+  // reset materials for next round
+  state.cement = 0;
+  state.dust = 0;
+  state.aggregate = 0;
+  saveState(); render();
+}
+
+function manualEmpty(){
+  // increment emptied counter only (does not save a round)
+  state.emptied = (state.emptied||0) + 1;
+  saveState(); render();
+}
+
+function undoRound(id){
+  // remove by id, decrement started & emptied if applicable
+  const idx = state.rounds.findIndex(r=>r.id===id);
+  if(idx===-1) return;
+  // remove
+  state.rounds.splice(idx,1);
+  // decrement machine counters but never below 0
+  state.started = Math.max(0, state.started - 1);
+  state.emptied = Math.max(0, state.emptied - 1);
+  saveState(); render();
+}
+
+function clearAll(){
+  if(!confirm('Clear everything? This will erase saved rounds and counters.')) return;
+  state = { cement:0,dust:0,aggregate:0,started:0,emptied:0,rounds:[] };
+  saveState(); render();
+}
+
+function downloadCSV(){
+  const headers = ['id','timestamp','cement','dust','aggregate','totalPans'];
+  const rows = state.rounds.map(r=>[r.id, new Date(r.ts).toISOString(), r.cement, r.dust, r.aggregate, r.cement + r.dust + r.aggregate]);
+  const csv = [headers.join(','), ...rows.map(r=>r.join(','))].join('\n');
+  const blob = new Blob([csv], {type:'text/csv'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = 'mixture_rounds.csv'; a.click(); URL.revokeObjectURL(url);
+}
+
+function restoreFromLocal(){
+  if(!confirm('Restore from localStorage (reload saved state)?')) return;
+  loadState();
+}
+
+// --- Initialization & keyboard shortcuts ---
+window.addEventListener('load', ()=>{
+  loadState();
+  // keyboard shortcuts: 1 = cement, 2 = dust, 3 = aggregate, n = new round, e = empty
+  window.addEventListener('keydown', (ev)=>{
+    if(ev.target.tagName === 'INPUT' || ev.target.tagName === 'TEXTAREA') return;
+    if(ev.key === '1') adjust('cement',1);
+    if(ev.key === '2') adjust('dust',1);
+    if(ev.key === '3') adjust('aggregate',1);
+    if(ev.key.toLowerCase() === 'n') newRound();
+    if(ev.key.toLowerCase() === 'e') manualEmpty();
+  });
+});
+
+</script>
+</body>
+</html>
